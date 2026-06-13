@@ -14,6 +14,8 @@ export const ROLES = [
     description: 'Élimine les villageois chaque nuit.',
     color: '#DE3C4B',
     required: true,
+    // quantity : le host peut définir combien de loups sont dans la partie
+    quantity: { min: 1, max: 6, default: 1 },
     icon: 'M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z',
   },
   {

@@ -35,20 +35,29 @@ const state = {
   connections: {},     // host only — peerId → DataConnection
   hostConn: null,      // guest only — DataConnection to host
   activeRoles: new Set(ROLES.map((r) => r.id)), // tous actifs par défaut
+  roleQuantities: Object.fromEntries(             // quantités par rôle (si défini)
+    ROLES.filter((r) => r.quantity).map((r) => [r.id, r.quantity.default])
+  ),
 };
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
 async function init() {
   const urlRoomId = location.hash.slice(1) || null;
-  const [session, profile, savedRoles] = await Promise.all([
+  const [session, profile, savedRoles, savedQuantities] = await Promise.all([
     get('session'),
     get('profile'),
     get('roleSettings'),
+    get('roleQuantities'),
   ]);
   const myProfile = profile || { username: 'Joueur', photo: null };
 
-  if (savedRoles) state.activeRoles = new Set(savedRoles);
+  if (savedRoles) {
+    state.activeRoles = new Set(savedRoles);
+    // Les rôles obligatoires sont toujours actifs, même avec des données anciennes
+    ROLES.filter((r) => r.required).forEach((r) => state.activeRoles.add(r.id));
+  }
+  if (savedQuantities) Object.assign(state.roleQuantities, savedQuantities);
 
   if (session?.role === 'host' && urlRoomId === session.roomId) {
     setupAsHost(myProfile, session.myPeerId);
@@ -89,6 +98,7 @@ function setupAsHost(profile, savedPeerId) {
   state.peer.on('connection', handleIncomingConnection);
 
   state.peer.on('error', (err) => {
+    console.error('[PeerJS host]', err.type, err);
     if (err.type === 'unavailable-id') {
       del('session');
       location.href = 'index.html';
@@ -304,7 +314,7 @@ function setupNavActions() {
     kickPlayer(btn.dataset.peerId);
   });
 
-  setupSettingsModal();
+  if (state.isHost) setupSettingsModal();
 }
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
@@ -337,6 +347,9 @@ function setupSettingsModal() {
   document.getElementById('settings-content').addEventListener('click', (e) => {
     const toggle = e.target.closest('.section-toggle');
     if (toggle) { toggleSection(toggle.dataset.target); return; }
+
+    const qtyBtn = e.target.closest('.role-qty-btn');
+    if (qtyBtn) { changeRoleQuantity(qtyBtn.dataset.roleId, qtyBtn.dataset.dir); return; }
 
     const roleCard = e.target.closest('.role-card');
     if (roleCard) { toggleRole(roleCard.dataset.roleId); return; }
@@ -396,21 +409,27 @@ function createRoleCard(role) {
   </svg>`;
 
   const cursor = role.required ? 'cursor-not-allowed' : 'cursor-pointer active:scale-95';
-  const lockBadge = role.required
-    ? `<svg class="w-3.5 h-3.5 text-white/60 flex-shrink-0 ml-auto" fill="currentColor" viewBox="0 0 24 24">
-         <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-       </svg>`
-    : '';
+
+  const lockIcon = `<svg class="w-3.5 h-3.5 text-white/50 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+  </svg>`;
+
+  const rightSection = (() => {
+    if (!active) return '';
+    const qty = role.quantity ? buildQtyControl(role) : '';
+    const lock = role.required ? lockIcon : '';
+    return `<div class="flex items-center gap-2 flex-shrink-0 ml-auto">${qty}${lock}</div>`;
+  })();
 
   if (active) {
     return `
-      <div class="role-card rounded-2xl px-4 py-3 flex items-center gap-4 ${cursor} select-none transition-transform text-white border-2 border-transparent" data-role-id="${role.id}" style="background-color:${role.color}">
+      <div class="role-card rounded-2xl px-4 py-3 flex items-center gap-3 ${cursor} select-none transition-transform text-white border-2 border-transparent" data-role-id="${role.id}" style="background-color:${role.color}">
         ${iconSvg}
         <div class="flex-1 min-w-0">
           <p class="font-bold text-sm leading-tight">${escapeHtml(role.name)}</p>
           <p class="text-xs text-white/70 leading-tight mt-0.5">${escapeHtml(role.description)}</p>
         </div>
-        ${lockBadge}
+        ${rightSection}
       </div>
     `;
   }
@@ -436,6 +455,34 @@ async function toggleRole(roleId) {
     state.activeRoles.add(roleId);
   }
   await set('roleSettings', [...state.activeRoles]);
+  renderRoles();
+}
+
+function buildQtyControl(role) {
+  const qty = state.roleQuantities[role.id] ?? role.quantity.default;
+  const atMin = qty <= role.quantity.min;
+  const atMax = qty >= role.quantity.max;
+  const btnBase = 'role-qty-btn w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm leading-none transition-colors';
+  return `
+    <div class="flex items-center gap-1">
+      <button class="${btnBase} ${atMin ? 'bg-white/10 text-white/30 cursor-not-allowed' : 'bg-white/20 text-white'}"
+        data-role-id="${role.id}" data-dir="-" ${atMin ? 'disabled' : ''}>−</button>
+      <span class="w-5 text-center font-bold text-sm tabular-nums">${qty}</span>
+      <button class="${btnBase} ${atMax ? 'bg-white/10 text-white/30 cursor-not-allowed' : 'bg-white/20 text-white'}"
+        data-role-id="${role.id}" data-dir="+" ${atMax ? 'disabled' : ''}>+</button>
+    </div>
+  `;
+}
+
+async function changeRoleQuantity(roleId, dir) {
+  const role = ROLES.find((r) => r.id === roleId);
+  if (!role?.quantity) return;
+  const current = state.roleQuantities[roleId] ?? role.quantity.default;
+  const next = dir === '+'
+    ? Math.min(current + 1, role.quantity.max)
+    : Math.max(current - 1, role.quantity.min);
+  state.roleQuantities[roleId] = next;
+  await set('roleQuantities', state.roleQuantities);
   renderRoles();
 }
 
