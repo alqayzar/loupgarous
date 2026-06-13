@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Salle d'attente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    };
+  </script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col font-sans">
+
+  <!-- Top color band -->
+  <div class="flex h-1.5 flex-shrink-0">
+    <div class="flex-1 bg-[#DE3C4B]"></div>
+    <div class="flex-1 bg-[#6380C2]"></div>
+    <div class="flex-1 bg-[#2CB585]"></div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+    <div class="flex items-center gap-3 min-w-0">
+      <!-- Status dot -->
+      <div class="w-2.5 h-2.5 rounded-full bg-[#2CB585] animate-pulse flex-shrink-0"></div>
+      <div class="min-w-0">
+        <p class="text-xs text-gray-400 uppercase tracking-wider leading-none mb-0.5">Code de la salle</p>
+        <div class="flex items-center gap-2">
+          <span id="room-id-display" class="font-mono font-bold text-gray-800 text-sm truncate">…</span>
+          <button id="btn-copy" class="text-[#6380C2] flex-shrink-0" title="Copier le code">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <button id="btn-leave" class="text-[#DE3C4B] font-semibold text-sm flex-shrink-0 active:scale-95 transition-transform select-none">
+      Quitter
+    </button>
+  </nav>
+
+  <!-- Main content -->
+  <main class="flex-1 flex flex-col p-5 gap-5 max-w-lg w-full mx-auto pb-28">
+
+    <div>
+      <h1 class="text-2xl font-black text-gray-900">Salle d'attente</h1>
+      <p id="player-count" class="text-sm text-gray-400 mt-0.5">0 joueur</p>
+    </div>
+
+    <!-- Players grid (2 cols mobile, 3 cols sm+) -->
+    <div id="players-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <!-- Player cards injected by JS -->
+    </div>
+
+  </main>
+
+  <!-- Host actions — fixed bottom bar, host only -->
+  <div id="host-actions" class="hidden fixed bottom-0 inset-x-0 z-40">
+  <div class="bg-white border-t border-gray-100 p-4 flex gap-3 max-w-lg mx-auto">
+    <button id="btn-settings" class="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-gray-100 text-gray-600 font-semibold active:scale-95 transition-transform select-none">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      Paramètres
+    </button>
+    <button id="btn-start" class="flex-1 py-3.5 rounded-2xl bg-[#2CB585] text-white font-bold active:scale-95 transition-transform select-none shadow-sm">
+      Lancer
+    </button>
+  </div>
+  </div>
+
+  <!-- Settings modal (host only) -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 hidden">
+    <div class="bg-white rounded-t-3xl w-full max-w-lg flex flex-col max-h-[80vh]">
+
+      <!-- Header fixe -->
+      <div class="px-6 pt-6 pb-4 flex-shrink-0">
+        <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-black text-gray-900">Paramètres</h2>
+          <button id="btn-close-settings" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:scale-95 transition-transform">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenu scrollable — sections injectées par JS -->
+      <div id="settings-content" class="overflow-y-auto flex-1 px-6 pb-8"></div>
+
+    </div>
+  </div>
+
+  <!-- Error banner (bottom, dismissable) -->
+  <div id="error-banner" class="hidden fixed bottom-4 left-4 right-4 max-w-lg mx-auto bg-[#DE3C4B] text-white text-sm font-semibold px-4 py-3 rounded-xl shadow-lg z-50">
+  </div>
+
+  <script type="module" src="js/room.js"></script>
+</body>
+</html>

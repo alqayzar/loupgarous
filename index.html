@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loup Garous</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    };
+  </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col font-sans">
+
+  <!-- Top color band -->
+  <div class="flex h-1.5 flex-shrink-0">
+    <div class="flex-1 bg-[#DE3C4B]"></div>
+    <div class="flex-1 bg-[#6380C2]"></div>
+    <div class="flex-1 bg-[#2CB585]"></div>
+  </div>
+
+  <main class="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-10">
+
+    <!-- Title -->
+    <div class="text-center">
+      <h1 class="text-5xl font-black text-gray-900 tracking-tight">Loup</h1>
+      <div class="flex items-center gap-2 justify-center">
+        <div class="h-3 w-10 bg-[#DE3C4B] rounded-sm"></div>
+        <h1 class="text-5xl font-black text-gray-900 tracking-tight">Garous</h1>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div class="flex flex-col items-center gap-5 w-full max-w-xs">
+
+      <!-- Avatar -->
+      <div class="relative cursor-pointer group" id="avatar-wrapper">
+        <div class="w-24 h-24 rounded-full bg-gray-100 border-4 border-white shadow-md overflow-hidden flex items-center justify-center">
+          <svg id="avatar-placeholder" class="w-12 h-12 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+          </svg>
+          <img id="avatar-img" class="w-full h-full object-cover hidden" src="" alt="avatar">
+        </div>
+        <!-- Camera overlay -->
+        <div class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" class="hidden">
+      </div>
+
+      <!-- Username -->
+      <div class="w-full">
+        <input
+          type="text"
+          id="username-input"
+          placeholder="Ton pseudo"
+          maxlength="20"
+          autocomplete="off"
+          class="w-full text-center text-lg font-semibold border-b-2 border-gray-200 focus:border-[#6380C2] outline-none py-2 px-2 bg-transparent text-gray-800 placeholder-gray-300 transition-colors"
+        >
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="flex flex-col gap-3 w-full max-w-xs">
+      <button id="btn-create" class="w-full py-4 bg-[#DE3C4B] text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-transform select-none">
+        Créer une partie
+      </button>
+      <button id="btn-join" class="w-full py-4 bg-[#6380C2] text-white text-lg font-bold rounded-2xl shadow-lg active:scale-95 transition-transform select-none">
+        Rejoindre
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Join modal -->
+  <div id="join-modal" class="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-6 hidden z-50">
+    <div class="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+      <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 sm:hidden"></div>
+      <h2 class="text-xl font-bold text-gray-900 mb-1">Rejoindre une partie</h2>
+      <p class="text-sm text-gray-400 mb-4">Entrez le code partagé par le host.</p>
+      <input
+        type="text"
+        id="room-id-input"
+        placeholder="ABC-DEF"
+        autocomplete="off"
+        class="w-full border-2 border-gray-100 rounded-xl py-3 px-4 text-gray-800 font-mono font-semibold tracking-wider focus:border-[#6380C2] focus:outline-none mb-4 text-center transition-colors bg-gray-50"
+      >
+      <div class="flex gap-3">
+        <button id="btn-cancel-join" class="flex-1 py-3 border-2 border-gray-100 rounded-xl font-semibold text-gray-500 active:scale-95 transition-transform select-none">
+          Annuler
+        </button>
+        <button id="btn-confirm-join" class="flex-1 py-3 bg-[#6380C2] text-white rounded-xl font-bold active:scale-95 transition-transform select-none">
+          Rejoindre
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
