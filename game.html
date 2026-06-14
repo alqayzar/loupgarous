@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partie</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    };
+  </script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+  <!-- ─── Toasts ─────────────────────────────────────────────────────────────── -->
+  <div id="toast-container" class="fixed top-4 left-4 right-4 max-w-lg mx-auto z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ─── Overlay : yeux fermés ─────────────────────────────────────────────── -->
+  <div id="eyes-closed-overlay" class="fixed inset-0 bg-gray-950 z-30 flex flex-col items-center justify-center gap-5" style="display:none">
+    <svg class="w-20 h-20 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>
+      <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <p class="text-2xl font-black text-white tracking-tight">Fermez les yeux</p>
+    <p id="eyes-closed-label" class="text-sm text-gray-500"></p>
+  </div>
+
+  <!-- ─── Barre d'action de nuit (loups / village) ──────────────────────────── -->
+  <div id="night-action-bar" class="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100" style="display:none">
+    <div class="p-4 flex gap-3 max-w-lg mx-auto">
+      <button id="btn-night-cancel" class="px-5 py-3.5 rounded-2xl border-2 border-gray-100 text-gray-500 font-semibold active:scale-95 transition-transform select-none" style="display:none">
+        Annuler
+      </button>
+      <button id="btn-night-confirm" class="flex-1 py-3.5 rounded-2xl bg-[#DE3C4B] text-white font-bold active:scale-95 transition-transform select-none opacity-50" disabled>
+        Confirmer
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Barre d'action sorcière ────────────────────────────────────────────── -->
+  <div id="witch-action-bar" class="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100" style="display:none">
+    <div class="p-4 flex gap-3 max-w-lg mx-auto">
+      <!-- Ressusciter -->
+      <button id="btn-witch-revive" title="Ressusciter"
+        class="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border-2 border-[#2CB585] text-[#2CB585] font-semibold active:scale-95 transition-transform select-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+        </svg>
+        <span class="text-xs">Ressusciter</span>
+      </button>
+      <!-- Tuer -->
+      <button id="btn-witch-kill" title="Tuer"
+        class="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border-2 border-[#DE3C4B] text-[#DE3C4B] font-semibold active:scale-95 transition-transform select-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        <span class="text-xs">Tuer</span>
+      </button>
+      <!-- Terminer -->
+      <button id="btn-witch-done" title="Terminer le tour"
+        class="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-500 font-semibold active:scale-95 transition-transform select-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <span class="text-xs">Terminer</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Écran 1 : Révélation du rôle ────────────────────────────────────── -->
+  <div id="screen-reveal" class="fixed inset-0 flex flex-col">
+    <div class="flex h-1.5 flex-shrink-0">
+      <div class="flex-1 bg-[#DE3C4B]"></div>
+      <div class="flex-1 bg-[#6380C2]"></div>
+      <div class="flex-1 bg-[#2CB585]"></div>
+    </div>
+    <div id="reveal-bg" class="flex-1 flex flex-col items-center justify-center px-8 gap-8">
+      <svg id="reveal-icon" class="w-28 h-28 text-white" fill="currentColor" viewBox="0 0 24 24"></svg>
+      <div class="text-center">
+        <p class="text-sm font-bold uppercase tracking-widest text-white/50 mb-2">Votre rôle</p>
+        <h1 id="reveal-name" class="text-5xl font-black text-white tracking-tight leading-none"></h1>
+        <p id="reveal-desc" class="text-base text-white/70 mt-3 leading-relaxed max-w-xs mx-auto"></p>
+      </div>
+    </div>
+    <div class="p-5 pb-10 flex-shrink-0">
+      <button id="btn-continue" class="w-full py-4 bg-white text-gray-900 text-lg font-bold rounded-2xl active:scale-95 transition-transform select-none shadow-sm">
+        Continuer
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Écran 2 : Vue joueurs ────────────────────────────────────────────── -->
+  <div id="screen-players" class="flex-col min-h-screen" style="display:none">
+    <div class="flex h-1.5 flex-shrink-0">
+      <div class="flex-1 bg-[#DE3C4B]"></div>
+      <div class="flex-1 bg-[#6380C2]"></div>
+      <div class="flex-1 bg-[#2CB585]"></div>
+    </div>
+
+    <!-- Bannière de phase (nuit) -->
+    <div id="phase-banner" class="bg-gray-900 px-4 py-2 text-center text-xs font-bold uppercase tracking-wider text-white/50" style="display:none">
+      <span id="phase-banner-text"></span>
+    </div>
+
+    <nav class="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+      <div class="w-2.5 h-2.5 rounded-full bg-[#2CB585] animate-pulse flex-shrink-0"></div>
+      <div>
+        <p class="text-xs text-gray-400 uppercase tracking-wider leading-none mb-0.5">Partie en cours</p>
+        <span id="game-room-id" class="font-mono font-bold text-gray-800 text-sm"></span>
+      </div>
+    </nav>
+
+    <main class="flex-1 p-5 max-w-lg w-full mx-auto pb-28">
+      <div id="game-players-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </main>
+
+    <!-- Barre principale (toujours visible) -->
+    <div class="fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-100">
+      <div class="p-4 flex items-center gap-2 max-w-lg mx-auto">
+        <button id="btn-show-role" title="Voir mon rôle"
+          class="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-2xl border-2 border-gray-100 text-gray-600 active:scale-95 transition-transform select-none">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+        </button>
+        <button id="btn-stop-game" style="display:none"
+          class="px-4 py-3.5 rounded-2xl border-2 border-gray-100 text-gray-500 font-semibold active:scale-95 transition-transform select-none text-sm">
+          Arrêter
+        </button>
+        <button id="btn-restart-game" style="display:none"
+          class="px-4 py-3.5 rounded-2xl border-2 border-gray-100 text-gray-500 font-semibold active:scale-95 transition-transform select-none text-sm">
+          Relancer
+        </button>
+        <button id="btn-next-night" style="display:none"
+          class="flex-1 py-3.5 rounded-2xl bg-gray-900 text-white font-bold active:scale-95 transition-transform select-none">
+          Nuit suivante →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>

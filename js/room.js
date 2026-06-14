@@ -1,6 +1,7 @@
 import { get, set, del } from './storage.js';
-import { ROLES } from './roles.js';
+import { ROLES, assignRoles } from './roles.js';
 import { say, cancel, isSpeaking } from './voice.js';
+import { DEFAULT_PHRASES, PHRASE_LABELS } from './phrases.js';
 
 const COLORS = ['#DE3C4B', '#6380C2', '#2CB585'];
 
@@ -34,23 +35,27 @@ const state = {
   players: [],         // [{ id, username, photo, isHost }]
   connections: {},     // host only — peerId → DataConnection
   hostConn: null,      // guest only — DataConnection to host
-  activeRoles: new Set(ROLES.map((r) => r.id)), // tous actifs par défaut
-  roleQuantities: Object.fromEntries(             // quantités par rôle (si défini)
+  activeRoles: new Set(ROLES.map((r) => r.id)),
+  roleQuantities: Object.fromEntries(
     ROLES.filter((r) => r.quantity).map((r) => [r.id, r.quantity.default])
   ),
+  phrases: { ...DEFAULT_PHRASES },
 };
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
 async function init() {
   const urlRoomId = location.hash.slice(1) || null;
-  const [session, profile, savedRoles, savedQuantities] = await Promise.all([
+  const [session, profile, savedRoles, savedQuantities, savedPhrases] = await Promise.all([
     get('session'),
     get('profile'),
     get('roleSettings'),
     get('roleQuantities'),
+    get('voicePhrases'),
   ]);
   const myProfile = profile || { username: 'Joueur', photo: null };
+
+  if (savedPhrases) Object.assign(state.phrases, savedPhrases);
 
   if (savedRoles) {
     state.activeRoles = new Set(savedRoles);
@@ -157,6 +162,37 @@ function broadcastPlayerList() {
   });
 }
 
+function startGame() {
+  if (state.players.length < 2) {
+    showError('Il faut au moins 2 joueurs pour lancer la partie.');
+    return;
+  }
+
+  const assignments = assignRoles(state.players, state.activeRoles, state.roleQuantities);
+  const myAssignment = assignments.find((a) => a.peerId === state.myId);
+
+  set('gameSession', {
+    isHost: true,
+    roomId: state.roomId,
+    myId: state.myId,
+    myRoleId: myAssignment?.roleId ?? 'villager',
+    players: state.players,
+    assignments,
+    activeRoles: [...state.activeRoles],
+    roleQuantities: { ...state.roleQuantities },
+    phrases: { ...state.phrases },
+  }).then(() => {
+    assignments.forEach(({ peerId, roleId }) => {
+      if (peerId === state.myId) return;
+      const conn = state.connections[peerId];
+      if (conn?.open) conn.send({ type: 'game-start', roleId, players: state.players });
+    });
+    setTimeout(() => {
+      location.href = `game.html#${state.roomId}`;
+    }, 250);
+  });
+}
+
 // ─── Guest Mode ───────────────────────────────────────────────────────────────
 
 function setupAsGuest(profile, targetRoomId, savedPeerId) {
@@ -201,7 +237,7 @@ function connectToHost(profile, targetRoomId) {
     });
   });
 
-  conn.on('data', (data) => {
+  conn.on('data', async (data) => {
     if (data.type === 'playerList') {
       state.players = data.players.map((p) => ({ ...p, photo: sanitizePhoto(p.photo) }));
       renderPlayers();
@@ -216,6 +252,17 @@ function connectToHost(profile, targetRoomId) {
       del('session');
       alert('Vous avez été expulsé de la partie.');
       location.href = 'index.html';
+    }
+    if (data.type === 'game-start') {
+      const players = (data.players || []).map((p) => ({ ...p, photo: sanitizePhoto(p.photo) }));
+      await set('gameSession', {
+        isHost: false,
+        roomId: state.roomId,
+        myId: state.myId,
+        myRoleId: data.roleId,
+        players,
+      });
+      location.href = `game.html#${state.roomId}`;
     }
   });
 
@@ -314,7 +361,10 @@ function setupNavActions() {
     kickPlayer(btn.dataset.peerId);
   });
 
-  if (state.isHost) setupSettingsModal();
+  if (state.isHost) {
+    document.getElementById('btn-start').addEventListener('click', startGame);
+    setupSettingsModal();
+  }
 }
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
@@ -335,12 +385,17 @@ function setupSettingsModal() {
     if (e.target === modal) modal.classList.add('hidden');
   });
 
-  // Mise à jour temps réel des valeurs des sliders voix
   document.getElementById('settings-content').addEventListener('input', (e) => {
     if (e.target.id === 'voice-rate')
       document.getElementById('voice-rate-val').textContent = parseFloat(e.target.value).toFixed(2);
     if (e.target.id === 'voice-pitch')
       document.getElementById('voice-pitch-val').textContent = parseFloat(e.target.value).toFixed(1);
+
+    const phraseInput = e.target.closest('.phrase-input');
+    if (phraseInput) {
+      state.phrases[phraseInput.dataset.phraseKey] = phraseInput.value;
+      set('voicePhrases', { ...state.phrases });
+    }
   });
 
   // Délégation unique pour les sections, rôles et test voix
@@ -362,8 +417,9 @@ function setupSettingsModal() {
 // Ajouter une section ici pour qu'elle apparaisse dans les paramètres
 function renderSettings() {
   const sections = [
-    { id: 'roles',  title: 'Rôles disponibles', html: ROLES.map(createRoleCard).join('') },
-    { id: 'voice',  title: 'Voix',              html: buildVoiceTestHtml() },
+    { id: 'roles',     title: 'Rôles disponibles', html: ROLES.map(createRoleCard).join('') },
+    { id: 'narration', title: 'Narration',          html: buildNarrationHtml() },
+    { id: 'voice',     title: 'Voix',               html: buildVoiceTestHtml() },
   ];
 
   document.getElementById('settings-content').innerHTML = sections
@@ -490,6 +546,17 @@ async function changeRoleQuantity(roleId, dir) {
 
 const VOICE_ICON_PLAY = `<svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
 const VOICE_ICON_STOP = `<svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>`;
+
+function buildNarrationHtml() {
+  return Object.entries(PHRASE_LABELS).map(([key, label]) => `
+    <div class="flex flex-col gap-1">
+      <label class="text-xs font-semibold text-gray-500">${escapeHtml(label)}</label>
+      <input type="text" class="phrase-input border-2 border-gray-100 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#6380C2] focus:outline-none bg-gray-50"
+        data-phrase-key="${escapeAttr(key)}"
+        value="${escapeAttr(state.phrases[key] ?? DEFAULT_PHRASES[key])}">
+    </div>
+  `).join('');
+}
 
 function buildVoiceTestHtml() {
   return `

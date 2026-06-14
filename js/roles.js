@@ -27,3 +27,36 @@ export const ROLES = [
     icon: 'M12 2l2.65 8.16H23l-6.96 5.06 2.65 8.16L12 18.32l-6.69 4.06 2.65-8.16L2 10.16h8.35z',
   },
 ];
+
+/**
+ * Assigne aléatoirement un rôle par joueur.
+ * Les rôles spéciaux remplissent le pool selon leur quantité,
+ * les places restantes sont complétées avec des villageois.
+ *
+ * @param {Array<{id: string}>} players
+ * @param {Set<string>} activeRoles
+ * @param {Object} roleQuantities  — { roleId: number }
+ * @returns {Array<{peerId: string, roleId: string}>}
+ */
+export function assignRoles(players, activeRoles, roleQuantities) {
+  const pool = [];
+
+  ROLES.forEach((role) => {
+    if (role.id === 'villager') return;
+    if (!activeRoles.has(role.id)) return;
+    const qty = roleQuantities[role.id] ?? role.quantity?.default ?? 1;
+    for (let i = 0; i < qty; i++) pool.push(role.id);
+  });
+
+  // Compléter avec des villageois
+  while (pool.length < players.length) pool.push('villager');
+  pool.splice(players.length);
+
+  // Fisher-Yates shuffle
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  return players.map((player, i) => ({ peerId: player.id, roleId: pool[i] }));
+}
